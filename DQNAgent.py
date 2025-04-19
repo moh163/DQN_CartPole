@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from cartpole import CustomCartPoleEnv
+import matplotlib.pyplot as plt
 
 from gymnasium.wrappers import TimeLimit
 
@@ -49,26 +50,6 @@ class DQNAgent:
         self.optimizer = optim.RMSprop(self.model.parameters(), lr=0.00025, alpha=0.95, eps=0.01)
         self.criterion = nn.MSELoss()
 
-
-
-
-
-
-        
-        '''
-        # --- Customizable CartPole physics parameters ---
-        self.env.env.gravity = 9.8
-        self.env.env.masscart = 1.0
-        self.env.env.masspole = 0.1
-        self.env.env.total_mass = self.env.env.masscart + self.env.env.masspole
-        self.env.env.length = 0.5  # Half the pole length
-        self.env.env.polemass_length = self.env.env.masspole * self.env.env.length
-        self.env.env.force_mag = 10.0
-        self.env.env.tau = 0.02  # Time between state updates
-        self.env.env.theta_threshold_radians = 6 * 2 * math.pi / 360
-        self.env.env.x_threshold = 2.4
-        self.theta_threshold_radians = 4 * 2 * math.pi / 360
-        '''
     # Stockage d'une transition dans la mémoire
     def remember(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
@@ -137,32 +118,47 @@ class DQNAgent:
     
     # Boucle d'entraînement
     def run(self):
+        episode_rewards = []  # Liste pour stocker la récompense cumulée de chaque épisode
         for e in range(self.EPISODES):
             state, _ = self.env.reset()
             state = np.reshape(state, [1, self.state_size])
             done = False
             i = 0
+            cumulative_reward = 0  # Récompense cumulée pour cet épisode
             while not done:
                 self.env.render()
                 action = self.act(state)
-                next_state, reward, terminated, truncated, _= self.env.step(action)
+                next_state, reward, terminated, truncated, _ = self.env.step(action)
                 done = terminated or truncated
                 next_state = np.reshape(next_state, [1, self.state_size])
-                # Pénalité si l'épisode se termine prématurément
+                # Appliquer une pénalité si l'épisode se termine prématurément
                 if done and i < self.env._max_episode_steps - 1:
                     reward = -100
+                cumulative_reward += reward
                 self.remember(state, action, reward, next_state, done)
                 state = next_state
                 i += 1
                 if done:
-                    print("Episode: {}/{}, score: {}, epsilon: {:.2f}".format(e, self.EPISODES, i, self.epsilon))
-                    # Sauvegarde du modele avec le score max (ici 500)
+                    episode_rewards.append(cumulative_reward)  # Enregistre la récompense de l'épisode
+                    print("Episode: {}/{}, score: {}, récompense cumulée: {:.2f}, epsilon: {:.2f}".format(
+                        e, self.EPISODES, i, cumulative_reward, self.epsilon))
+                    # Sauvegarde du modèle avec le score max (ici 500)
                     if i == 500:
                         print("Saving trained model as cartpole-dqn.pth")
                         self.save("cartpole-dqn.pth")
+                        # Affichage du graphique après l'entraînement
+                        self.plot_rewards(episode_rewards)
                         return
                 self.replay()
-    
+        # Affichage du graphique une fois l'entraînement terminé
+        self.plot_rewards(episode_rewards)
+
+    def plot_rewards(self, rewards):
+        plt.plot(rewards)
+        plt.xlabel("Episode")
+        plt.ylabel("Récompense cumulée")
+        plt.title("Récompense cumulée par épisode")
+        plt.show()
     # Phase de test en chargeant un modèle sauvegardé
     def test(self):
         self.load("cartpole-dqn.pth")
@@ -187,6 +183,6 @@ class DQNAgent:
 if __name__ == "__main__":
     agent = DQNAgent()
     # Pour entraîner l'agent, décommentez la ligne suivante :
-    agent.run()
+    #agent.run()
     # Pour tester l'agent avec le modèle sauvegardé, utilisez :
-    #agent.test()
+    agent.test()
