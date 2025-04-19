@@ -2,10 +2,13 @@ import random
 import gymnasium as gym
 import numpy as np
 from collections import deque
-
+import math
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from cartpole import CustomCartPoleEnv
+
+from gymnasium.wrappers import TimeLimit
 
 
 device = torch.device("Cuda" if torch.cuda.is_available() else "cpu")
@@ -19,7 +22,7 @@ class DQN(nn.Module):
         self.fc3 = nn.Linear(256, 64)
         self.out = nn.Linear(64, action_size)
         self.relu = nn.ReLU()
-        
+
     def forward(self, x):
         x = self.relu(self.fc1(x))
         x = self.relu(self.fc2(x))
@@ -28,7 +31,7 @@ class DQN(nn.Module):
 
 class DQNAgent:
     def __init__(self):
-        self.env = gym.make("CartPole-v1",render_mode="human")
+        self.env = TimeLimit(CustomCartPoleEnv(render_mode="human"), max_episode_steps=500)
         self.state_size = self.env.observation_space.shape[0]   # CartPole= 4
         self.action_size = self.env.action_space.n               # (gauche, droite)
         self.EPISODES = 1000
@@ -46,6 +49,26 @@ class DQNAgent:
         self.optimizer = optim.RMSprop(self.model.parameters(), lr=0.00025, alpha=0.95, eps=0.01)
         self.criterion = nn.MSELoss()
 
+
+
+
+
+
+        
+        '''
+        # --- Customizable CartPole physics parameters ---
+        self.env.env.gravity = 9.8
+        self.env.env.masscart = 1.0
+        self.env.env.masspole = 0.1
+        self.env.env.total_mass = self.env.env.masscart + self.env.env.masspole
+        self.env.env.length = 0.5  # Half the pole length
+        self.env.env.polemass_length = self.env.env.masspole * self.env.env.length
+        self.env.env.force_mag = 10.0
+        self.env.env.tau = 0.02  # Time between state updates
+        self.env.env.theta_threshold_radians = 6 * 2 * math.pi / 360
+        self.env.env.x_threshold = 2.4
+        self.theta_threshold_radians = 4 * 2 * math.pi / 360
+        '''
     # Stockage d'une transition dans la mémoire
     def remember(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
