@@ -2,12 +2,12 @@ import random
 import gymnasium as gym
 import numpy as np
 from collections import deque
-import math
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from cartpole import CustomCartPoleEnv
 import matplotlib.pyplot as plt
+import time
 
 from gymnasium.wrappers import TimeLimit
 
@@ -18,21 +18,19 @@ device = torch.device("Cuda" if torch.cuda.is_available() else "cpu")
 class DQN(nn.Module):
     def __init__(self, state_size, action_size):
         super(DQN, self).__init__()
-        self.fc1 = nn.Linear(state_size, 512)
-        self.fc2 = nn.Linear(512, 256)
-        self.fc3 = nn.Linear(256, 64)
-        self.out = nn.Linear(64, action_size)
+        self.fc1 = nn.Linear(state_size, 256)
+        self.fc2 = nn.Linear(256, 256)
+        self.out = nn.Linear(256, action_size)
         self.relu = nn.ReLU()
 
     def forward(self, x):
         x = self.relu(self.fc1(x))
         x = self.relu(self.fc2(x))
-        x = self.relu(self.fc3(x))
         return self.out(x)
 
 class DQNAgent:
     def __init__(self):
-        self.env = TimeLimit(CustomCartPoleEnv(render_mode="human"), max_episode_steps=500)
+        self.env = TimeLimit(CustomCartPoleEnv(render_mode="rgb_array"), max_episode_steps=500)
         self.state_size = self.env.observation_space.shape[0]   # CartPole= 4
         self.action_size = self.env.action_space.n               # (gauche, droite)
         self.EPISODES = 1000
@@ -118,6 +116,7 @@ class DQNAgent:
     
     # Boucle d'entraînement
     def run(self):
+        start_time = time.time()
         episode_rewards = []  # Liste pour stocker la récompense cumulée de chaque épisode
         for e in range(self.EPISODES):
             state, _ = self.env.reset()
@@ -152,6 +151,8 @@ class DQNAgent:
                 self.replay()
         # Affichage du graphique une fois l'entraînement terminé
         self.plot_rewards(episode_rewards)
+        total_training_time = time.time() - start_time  # Temps total d'entraînement
+        print(f"Temps total d'entraînement : {total_training_time:.2f} secondes")
 
     def plot_rewards(self, rewards):
         plt.plot(rewards)
@@ -161,12 +162,18 @@ class DQNAgent:
         plt.show()
     # Phase de test en chargeant un modèle sauvegardé
     def test(self):
-        self.load("cartpole-dqn.pth")
+        self.load("./goodModel/petitmodele(906 episode).pth")
+        results = []  # Liste pour stocker les résultats de chaque épisode
+        success_count = 0
+        episode_rewards = []  # Liste pour stocker la récompense cumulée de chaque épisode
+        inference_times = []  # Liste pour stocker le temps d'inférence de chaque épisode
         for e in range(self.EPISODES):
             state, _ = self.env.reset()
             state = np.reshape(state, [1, self.state_size])
             done = False
             i = 0
+            cumulative_reward = 0  # Récompense cumulée pour cet épisode
+            start_time = time.time()
             while not done:
                 self.env.render()
                 state_tensor = torch.FloatTensor(state).to(device)
@@ -176,13 +183,28 @@ class DQNAgent:
                 done = terminated or truncated
                 state = np.reshape(next_state, [1, self.state_size])
                 i += 1
+                cumulative_reward += reward
                 if done:
-                    print("Episode: {}/{}, score: {}".format(e, self.EPISODES, i))
+                    episode_rewards.append(cumulative_reward)  # Enregistre la récompense de l'épisode
+                    if i == 500:
+                        success = "Oui"
+                        success_count += 1
+                    else:
+                        success = "Non"
+                    print("Episode: {}/{}, score: {}, atteint 500: {}".format(e, self.EPISODES, i, success))
+                    results.append((e, i, success))
                     break
+            inference_time = time.time() - start_time  # Temps d'inférence pour cet épisode
+            inference_times.append(inference_time)
+        print("Nombre d'épisodes réussis (atteignant 500): ", success_count)
+        print("Score moyen: ",np.mean(episode_rewards))
+        print(f"Temps moyen d'inférence par épisode : {np.mean(inference_times):.4f} secondes")
+
 
 if __name__ == "__main__":
     agent = DQNAgent()
     # Pour entraîner l'agent, décommentez la ligne suivante :
-    #agent.run()
+    agent.run()
     # Pour tester l'agent avec le modèle sauvegardé, utilisez :
-    agent.test()
+    
+    #agent.test()
