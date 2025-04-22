@@ -1,5 +1,4 @@
 import random
-import gymnasium as gym
 import numpy as np
 from collections import deque
 import torch
@@ -18,14 +17,16 @@ device = torch.device("Cuda" if torch.cuda.is_available() else "cpu")
 class DQN(nn.Module):
     def __init__(self, state_size, action_size):
         super(DQN, self).__init__()
-        self.fc1 = nn.Linear(state_size, 256)
-        self.fc2 = nn.Linear(256, 256)
-        self.out = nn.Linear(256, action_size)
+        self.fc1 = nn.Linear(state_size, 512)
+        self.fc2 = nn.Linear(512, 256)
+        self.fc3 = nn.Linear(256, 128)
+        self.out = nn.Linear(128, action_size)
         self.relu = nn.ReLU()
 
     def forward(self, x):
         x = self.relu(self.fc1(x))
         x = self.relu(self.fc2(x))
+        x = self.relu(self.fc3(x))
         return self.out(x)
 
 class DQNAgent:
@@ -33,7 +34,7 @@ class DQNAgent:
         self.env = TimeLimit(CustomCartPoleEnv(render_mode="rgb_array"), max_episode_steps=500)
         self.state_size = self.env.observation_space.shape[0]   # CartPole= 4
         self.action_size = self.env.action_space.n               # (gauche, droite)
-        self.EPISODES = 1000
+        self.EPISODES = 250
         self.memory = deque(maxlen=2000)
         
         self.gamma = 0.95      
@@ -147,6 +148,8 @@ class DQNAgent:
                         self.save("cartpole-dqn.pth")
                         # Affichage du graphique après l'entraînement
                         self.plot_rewards(episode_rewards)
+                        total_training_time = time.time() - start_time  # Temps total d'entraînement
+                        print(f"Temps total d'entraînement : {total_training_time:.2f} secondes")
                         return
                 self.replay()
         # Affichage du graphique une fois l'entraînement terminé
@@ -162,7 +165,7 @@ class DQNAgent:
         plt.show()
     # Phase de test en chargeant un modèle sauvegardé
     def test(self):
-        self.load("./goodModel/petitmodele(906 episode).pth")
+        self.load("cartpole-dqn.pth")
         results = []  # Liste pour stocker les résultats de chaque épisode
         success_count = 0
         episode_rewards = []  # Liste pour stocker la récompense cumulée de chaque épisode
@@ -206,5 +209,4 @@ if __name__ == "__main__":
     # Pour entraîner l'agent, décommentez la ligne suivante :
     agent.run()
     # Pour tester l'agent avec le modèle sauvegardé, utilisez :
-    
     #agent.test()
