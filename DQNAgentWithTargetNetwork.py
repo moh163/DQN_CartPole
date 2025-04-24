@@ -36,10 +36,10 @@ class DQNAgentTargetNetwork:
         self.set_seed(213) 
         self.state_size = self.env.observation_space.shape[0]
         self.action_size = self.env.action_space.n
-        self.EPISODES = 1000
-        self.memory = deque(maxlen=2000)
+        self.EPISODES = 2000
+        self.memory = deque(maxlen=5000)
         
-        self.gamma = 0.95
+        self.gamma = 0.995
         self.epsilon = 1.0
         self.epsilon_min = 0.001
         self.epsilon_decay = 0.999
@@ -49,10 +49,10 @@ class DQNAgentTargetNetwork:
         self.model = DQN(self.state_size, self.action_size).to(device)
         self.target_model = DQN(self.state_size, self.action_size).to(device)  
         self.update_target_model() 
-        self.target_update_freq = 100
+        self.target_update_freq = 500
         self.update_counter = 0
 
-        self.optimizer = optim.RMSprop(self.model.parameters(), lr=0.00025, alpha=0.95, eps=0.01)
+        self.optimizer = optim.RMSprop(self.model.parameters(), lr=1e-4, alpha=0.95, eps=0.01)
         self.criterion = nn.MSELoss()
     def set_seed(self, seed=seed):
         random.seed(seed)
@@ -134,9 +134,9 @@ class DQNAgentTargetNetwork:
     def run(self,render=True, return_rewards=False):
         start_time = time.time()
         episode_rewards = []  # Liste pour stocker la récompense cumulée de chaque épisode
-        recent_scores = deque(maxlen=2)
+        recent_scores = deque(maxlen=100)
         for e in range(self.EPISODES):
-            state, _ = self.env.reset(seed=seed)
+            state, _ = self.env.reset()
             state = np.reshape(state, [1, self.state_size])
             done = False
             i = 0
@@ -149,8 +149,8 @@ class DQNAgentTargetNetwork:
                 done = terminated or truncated
                 next_state = np.reshape(next_state, [1, self.state_size])
                 # Appliquer une pénalité si l'épisode se termine prématurément
-                # if done and i < self.env._max_episode_steps - 1:
-                #     reward = -100
+                if done and i < self.env._max_episode_steps - 1:
+                    reward = -10
                 cumulative_reward += reward
                 self.remember(state, action, reward, next_state, done)
                 state = next_state
@@ -162,11 +162,11 @@ class DQNAgentTargetNetwork:
                         print("Episode: {}/{}, score: {}, récompense cumulée: {:.2f}, epsilon: {:.4f}".format(
                             e, self.EPISODES, i, cumulative_reward, self.epsilon))
                     
-                    if i==500: #len(recent_scores) == 2 and np.mean(recent_scores) == 500:
-                        print("Saving trained model as cartpole-dqnTarget.pth")
-                        self.save("cartpole-dqnTarget.pth")
+                    if len(recent_scores) == 100 and np.mean(recent_scores) >=490:
                         total_training_time = time.time() - start_time  # Temps total d'entraînement
                         print(f"Temps total d'entraînement : {total_training_time:.2f} secondes")
+                        print("Saving trained model as cartpole-dqnTarget.pth")
+                        self.save("cartpole-dqnTarget.pth")
                         if return_rewards:
                             return episode_rewards
                         self.plot_rewards(episode_rewards)
@@ -174,6 +174,8 @@ class DQNAgentTargetNetwork:
                 self.replay()
         total_training_time = time.time() - start_time  # Temps total d'entraînement
         print(f"Temps total d'entraînement : {total_training_time:.2f} secondes")
+        print("Saving trained model as cartpole-dqnTarget.pth")
+        self.save("cartpole-dqnTarget.pth")
         if return_rewards:
             return episode_rewards
         self.plot_rewards(episode_rewards)
