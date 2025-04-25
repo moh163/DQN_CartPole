@@ -18,16 +18,18 @@ seed = 213
 class DQN(nn.Module):
     def __init__(self, state_size, action_size):
         super(DQN, self).__init__()
-        self.fc1 = nn.Linear(state_size, 512)
-        self.fc2 = nn.Linear(512, 256)
-        self.fc3 = nn.Linear(256, 128)
-        self.out = nn.Linear(128, action_size)
+        self.fc1 = nn.Linear(state_size, 256)
+        self.fc2 = nn.Linear(256, 256)
+        #self.fc3 = nn.Linear(256, 128)
+        self.out = nn.Linear(256, action_size)
         self.relu = nn.ReLU()
 
     def forward(self, x):
         x = self.relu(self.fc1(x))
-        x = self.relu(self.fc2(x))
-        x = self.relu(self.fc3(x))
+        if hasattr(self, 'fc2'):
+            x = self.relu(self.fc2(x))
+        if hasattr(self, 'fc3'):
+            x = self.relu(self.fc3(x))
         return self.out(x)
 
 class DQNAgentTargetNetwork:
@@ -36,7 +38,7 @@ class DQNAgentTargetNetwork:
         self.set_seed(213) 
         self.state_size = self.env.observation_space.shape[0]
         self.action_size = self.env.action_space.n
-        self.EPISODES = 2000
+        self.EPISODES = 1500
         self.memory = deque(maxlen=5000)
         
         self.gamma = 0.995
@@ -165,8 +167,8 @@ class DQNAgentTargetNetwork:
                     if len(recent_scores) == 100 and np.mean(recent_scores) >=490:
                         total_training_time = time.time() - start_time  # Temps total d'entraînement
                         print(f"Temps total d'entraînement : {total_training_time:.2f} secondes")
-                        print("Saving trained model as cartpole-dqnTarget.pth")
-                        self.save("cartpole-dqnTarget.pth")
+                        print("Saving trained model as cartpole-dqnTargetMoyen.pth")
+                        self.save("cartpole-dqnTargetMoyen.pth")
                         if return_rewards:
                             return episode_rewards
                         self.plot_rewards(episode_rewards)
@@ -174,8 +176,8 @@ class DQNAgentTargetNetwork:
                 self.replay()
         total_training_time = time.time() - start_time  # Temps total d'entraînement
         print(f"Temps total d'entraînement : {total_training_time:.2f} secondes")
-        print("Saving trained model as cartpole-dqnTarget.pth")
-        self.save("cartpole-dqnTarget.pth")
+        print("Saving trained model as cartpole-dqnTargetMoyen.pth")
+        self.save("cartpole-dqnTargetMoyen.pth")
         if return_rewards:
             return episode_rewards
         self.plot_rewards(episode_rewards)
@@ -188,7 +190,7 @@ class DQNAgentTargetNetwork:
         plt.show()
     # Phase de test en chargeant un modèle sauvegardé
     def test(self):
-        self.load("cartpole-dqnTarget.pth")
+        self.load("cartpole-dqnTargetMoyen.pth")
         self.EPISODES = 100
         results = []  # Liste pour stocker les résultats de chaque épisode
         success_count = 0
@@ -286,15 +288,13 @@ if __name__ == "__main__":
     # Pour entraîner l'agent, décommentez la ligne suivante :
     #agent.run()
     # Pour tester l'agent avec le modèle sauvegardé, utilisez :
-    agent.test()
+    #agent.test()
     # Pour tester les hyperparamètres, décommentez les ligne suivante :
-    # hyperparams_to_test = {
-    #     'learning_rate': [0.0001, 0.00025, 0.001],
-    #     'gamma': [0.90, 0.95, 0.99],
-    #     'epsilon_decay': [0.995, 0.999],
-    #     'batch_size': [32, 64, 128],
-    #     'epsilon_min': [0.01, 0.001],
-    #     'memory_size': [1000, 2000, 5000] 
-    # }
+    hyperparams_to_test = {
+        'learning_rate': [1e-4, 0.001],
+        'gamma': [0.90, 0.995],
+        'epsilon_min': [0.01, 0.001],
+        'memory_size': [1000, 5000] 
+    }
 
-    # test_hyperparameters(DQNAgentTargetNetwork, hyperparams_to_test, episodes=1000)
+    test_hyperparameters(DQNAgentTargetNetwork, hyperparams_to_test, episodes=1500)
