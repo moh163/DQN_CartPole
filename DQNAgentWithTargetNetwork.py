@@ -14,7 +14,6 @@ from gymnasium.wrappers import TimeLimit
 
 device = torch.device("Cuda" if torch.cuda.is_available() else "cpu")
 seed = 213
-# Définition du modèle DQN en PyTorch
 class DQN(nn.Module):
     def __init__(self, state_size, action_size):
         super(DQN, self).__init__()
@@ -64,26 +63,26 @@ class DQNAgentTargetNetwork:
             torch.cuda.manual_seed_all(seed)
         self.env.action_space.seed(seed) 
 
-    # Stockage d'une transition dans la mémoire
+
     def remember(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
         if len(self.memory) > self.train_start:
             if self.epsilon > self.epsilon_min:
                 self.epsilon *= self.epsilon_decay
 
-    # ε-greedy
+
     def act(self, state, test=False):
         if not test and np.random.rand() <= self.epsilon:
             return random.randrange(self.action_size)
         else:
-            state_tensor = torch.FloatTensor(state).to(device)  # forme (1, state_size)
+            state_tensor = torch.FloatTensor(state).to(device)  
             with torch.no_grad():
                 q_values = self.model(state_tensor)
             return np.argmax(q_values.cpu().data.numpy())
 
     def update_target_model(self):
         self.target_model.load_state_dict(self.model.state_dict())
-    #  experience replay sur mini-batch
+
     def replay(self):
         if len(self.memory) < self.train_start:
             return
@@ -125,24 +124,24 @@ class DQNAgentTargetNetwork:
         self.update_counter += 1
         if self.update_counter % self.target_update_freq == 0:
             self.update_target_model()
-    # Sauvegarde et chargement du modèle
+
     def save(self, name):
         torch.save(self.model.state_dict(), name)
     
     def load(self, name):
         self.model.load_state_dict(torch.load(name, map_location=device))
     
-    # Boucle d'entraînement
+
     def run(self,render=True, return_rewards=False):
         start_time = time.time()
-        episode_rewards = []  # Liste pour stocker la récompense cumulée de chaque épisode
-        recent_scores = deque(maxlen=100)
+        episode_rewards = [] 
+        recent_scores = deque(maxlen=5)
         for e in range(self.EPISODES):
             state, _ = self.env.reset()
             state = np.reshape(state, [1, self.state_size])
             done = False
             i = 0
-            cumulative_reward = 0  # Récompense cumulée pour cet épisode
+            cumulative_reward = 0  
             while not done:
                 if render:
                     self.env.render()
@@ -150,7 +149,7 @@ class DQNAgentTargetNetwork:
                 next_state, reward, terminated, truncated, _ = self.env.step(action)
                 done = terminated or truncated
                 next_state = np.reshape(next_state, [1, self.state_size])
-                # Appliquer une pénalité si l'épisode se termine prématurément
+
                 if done and i < self.env._max_episode_steps - 1:
                     reward = -10
                 cumulative_reward += reward
@@ -159,13 +158,13 @@ class DQNAgentTargetNetwork:
                 i += 1
                 if done:
                     recent_scores.append(i)
-                    episode_rewards.append(cumulative_reward)  # Enregistre la récompense de l'épisode
+                    episode_rewards.append(cumulative_reward)  
                     if render:
                         print("Episode: {}/{}, score: {}, récompense cumulée: {:.2f}, epsilon: {:.4f}".format(
                             e, self.EPISODES, i, cumulative_reward, self.epsilon))
                     
-                    if len(recent_scores) == 100 and np.mean(recent_scores) >=490:
-                        total_training_time = time.time() - start_time  # Temps total d'entraînement
+                    if len(recent_scores) == 5 and np.mean(recent_scores) >=490:
+                        total_training_time = time.time() - start_time 
                         print(f"Temps total d'entraînement : {total_training_time:.2f} secondes")
                         print("Saving trained model as cartpole-dqnTargetMoyen.pth")
                         self.save("cartpole-dqnTargetMoyen.pth")
@@ -174,7 +173,7 @@ class DQNAgentTargetNetwork:
                         self.plot_rewards(episode_rewards)
                         return
                 self.replay()
-        total_training_time = time.time() - start_time  # Temps total d'entraînement
+        total_training_time = time.time() - start_time  
         print(f"Temps total d'entraînement : {total_training_time:.2f} secondes")
         print("Saving trained model as cartpole-dqnTargetMoyen.pth")
         self.save("cartpole-dqnTargetMoyen.pth")
@@ -188,20 +187,20 @@ class DQNAgentTargetNetwork:
         plt.ylabel("Récompense cumulée")
         plt.title("Récompense cumulée par épisode")
         plt.show()
-    # Phase de test en chargeant un modèle sauvegardé
+
     def test(self):
         self.load("cartpole-dqnTargetMoyen.pth")
         self.EPISODES = 100
-        results = []  # Liste pour stocker les résultats de chaque épisode
+        results = []
         success_count = 0
-        episode_rewards = []  # Liste pour stocker la récompense cumulée de chaque épisode
-        inference_times = []  # Liste pour stocker le temps d'inférence de chaque épisode
+        episode_rewards = []  
+        inference_times = []  
         for e in range(self.EPISODES):
             state, _ = self.env.reset()
             state = np.reshape(state, [1, self.state_size])
             done = False
             i = 0
-            cumulative_reward = 0  # Récompense cumulée pour cet épisode
+            cumulative_reward = 0  
             start_time = time.time()
             while not done:
                 self.env.render()
@@ -212,7 +211,7 @@ class DQNAgentTargetNetwork:
                 i += 1
                 cumulative_reward += reward
                 if done:
-                    episode_rewards.append(cumulative_reward)  # Enregistre la récompense de l'épisode
+                    episode_rewards.append(cumulative_reward) 
                     if i == 500:
                         success = "Oui"
                         success_count += 1
@@ -221,7 +220,7 @@ class DQNAgentTargetNetwork:
                     print("Episode: {}/{}, score: {}, atteint 500: {}".format(e, self.EPISODES, i, success))
                     results.append((e, i, success))
                     break
-            inference_time = time.time() - start_time  # Temps d'inférence pour cet épisode
+            inference_time = time.time() - start_time 
             inference_times.append(inference_time)
         print("Nombre d'épisodes réussis (atteignant 500): ", success_count)
         print("Score moyen: ",np.mean(episode_rewards))
@@ -232,69 +231,80 @@ class DQNAgentTargetNetwork:
     def update_memory_size(self, memory_size):
         self.memory = deque(maxlen=memory_size)
 
-def plot_rl_results(data_dict, title, xlabel, ylabel, window_size=5, save_path=None):
-    plt.figure(figsize=(10, 6))
-    for label, data in data_dict.items():
-        data = np.array(data)
-        #smoothed_data = np.convolve(data, np.ones(window_size) / window_size, mode='valid')
-        episodes = np.arange(len(data))
-        plt.plot(episodes, data, label=label)
 
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
+def test_env_param_variations(param_name, values, max_episode_steps=500):
+    from cartpole import CustomCartPoleEnv
+    from gymnasium.wrappers import TimeLimit
+    save_dir = r"C:\Users\Lenovo LEGION\Downloads\DQN_CartPole\params2"
+    os.makedirs(save_dir, exist_ok=True)
+
+    results = {}
+    all_rewards = {}
+
+    for val in values:
+        print(f"\nTesting {param_name} = {val}")
+        env_kwargs = {
+            param_name: val,
+            "render_mode": "rgb_array"
+        }
+        env = TimeLimit(CustomCartPoleEnv(**env_kwargs), max_episode_steps=max_episode_steps)
+
+        agent = DQNAgentTargetNetwork()
+        agent.env = env
+        agent.state_size = env.observation_space.shape[0]
+        agent.action_size = env.action_space.n
+
+        start_time = time.time()
+        episode_rewards = agent.run(render=False, return_rewards=True)
+        episodes_taken = len(episode_rewards)
+        duration = time.time() - start_time
+
+        print(f"→ Reached requirements in {episodes_taken} episodes ({duration:.2f}s)")
+
+        results[val] = episodes_taken
+        all_rewards[val] = episode_rewards
+
+    plt.figure(figsize=(8,5))
+    plt.plot(list(results.keys()), list(results.values()), marker='o')
+    plt.title(f"Impact of {param_name} on training speed")
+    plt.xlabel(param_name)
+    plt.ylabel("Episodes needed")
+    plt.grid(True)
+    plt.savefig(os.path.join(save_dir, f"{param_name}_episodes_plot.png"))
+
+    print(f" Saved plot to {param_name}_episodes_plot.png")
+    plt.close()
+
+    for val, rewards in all_rewards.items():
+        plt.figure(figsize=(8,5))
+        plt.plot(range(len(rewards)), rewards)
+        plt.title(f"{param_name}={val} : Cumulative rewards per episode")
+        plt.xlabel("Episode")
+        plt.ylabel("Cumulative Reward")
+        plt.grid(True)
+        plt.savefig(os.path.join(save_dir, f"{param_name}_{val}_rewards_plot.png"))
+
+        print(f" Saved plot to {param_name}_{val}_rewards_plot.png")
+        plt.close()
+
+    plt.figure(figsize=(10,6))
+    for val, rewards in all_rewards.items():
+        plt.plot(range(len(rewards)), rewards, label=f"{param_name}={val}")
+
+    plt.title(f"Comparaison de {param_name} (cumulative rewards)")
+    plt.xlabel("Episodes")
+    plt.ylabel("Cumulative Reward")
     plt.legend()
     plt.grid(True)
-    plt.tight_layout()
-    
-    if save_path:
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        plt.savefig(save_path)
-        print(f"✅ Plot saved to: {save_path}")
-        plt.close()
-    else:
-        plt.show()
+    plt.savefig(os.path.join(save_dir, f"{param_name}_combined_rewards_plot.png"))
 
-def test_hyperparameters(agent_class, hyperparams_dict, episodes=100, output_dir="plotsConstantWithTarget"):
-    for param_name, param_values in hyperparams_dict.items():
-        results = {}
-        print(f"\n--- Testing variations of '{param_name}' ---")
-        for value in param_values:
-            label = f"{param_name}={value}"
-            print(f"→ {label}")
-            agent = agent_class()
-            if param_name == 'learning_rate':
-                agent.update_optimizer(value)
-            elif param_name == 'memory_size':
-                agent.update_memory_size(value)
-            else:
-                setattr(agent, param_name, value)
-            agent.EPISODES = episodes
-            rewards = agent.run(render=False, return_rewards=True)
-            results[label] = rewards
+    print(f" Saved plot to {param_name}_combined_rewards_plot.png")
+    plt.close()
 
-        plot_filename = os.path.join(output_dir, f"{param_name}_comparison.png")
-        plot_rl_results(
-            results,
-            title=f"Effet de {param_name} sur la performance",
-            xlabel="Épisodes",
-            ylabel="Récompense cumulée",
-            save_path=plot_filename
-        )
 
 
 if __name__ == "__main__":
-    agent = DQNAgentTargetNetwork()
-    # Pour entraîner l'agent, décommentez la ligne suivante :
-    #agent.run()
-    # Pour tester l'agent avec le modèle sauvegardé, utilisez :
-    #agent.test()
-    # Pour tester les hyperparamètres, décommentez les ligne suivante :
-    hyperparams_to_test = {
-        'learning_rate': [1e-4, 0.001],
-        'gamma': [0.90, 0.995],
-        'epsilon_min': [0.01, 0.001],
-        'memory_size': [1000, 5000] 
-    }
+    test_env_param_variations("force_mag", [5.0, 7.5, 10.0, 12.5, 15.0])
+    test_env_param_variations("theta_threshold_radians", [0.05, 0.1, 0.15, 0.2,0.4])
+    test_env_param_variations("x_threshold", [1,1.5, 2.4, 3.0,4.8])
 
-    test_hyperparameters(DQNAgentTargetNetwork, hyperparams_to_test, episodes=1500)
